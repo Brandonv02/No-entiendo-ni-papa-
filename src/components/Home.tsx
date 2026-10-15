@@ -7,7 +7,8 @@ import { ErrorBox, Loading, Ring, Stat } from "./ui";
 import { usePwa } from "@/lib/pwa";
 import type { MascotContext } from "@/lib/mascot";
 import { isUnlocked } from "@/lib/progress";
-import { useLessonRecords, useSettings, useStats } from "@/lib/useData";
+import { useLessonRecords, useResumeList, useSettings, useStats } from "@/lib/useData";
+import { describeResume } from "@/lib/resume";
 import { LESSONS, unitById } from "@/content";
 import { SLOGAN } from "@/lib/copy";
 
@@ -16,14 +17,15 @@ export default function Home() {
   const settings = useSettings();
   const stats = useStats();
   const records = useLessonRecords();
+  const resumes = useResumeList();
   const pwa = usePwa();
 
   useEffect(() => {
     if (settings.data && !settings.data.onboarded) router.replace("/welcome/");
   }, [settings.data, router]);
 
-  if (settings.error) return <ErrorBox error={settings.error} onRetry={() => location.reload()} />;
-  if (!settings.data || !stats.data || records.loading) return <Loading />;
+  if (settings.error || resumes.error) return <ErrorBox error={(settings.error ?? resumes.error)!} onRetry={() => location.reload()} />;
+  if (!settings.data || !stats.data || records.loading || resumes.loading) return <Loading />;
   if (!settings.data.onboarded) return <Loading text="Preparando tu bienvenida…" />;
 
   const s = stats.data;
@@ -31,6 +33,7 @@ export default function Home() {
   const nextIdx = LESSONS.findIndex((l, i) => !records.data.get(l.id)?.passed && isUnlocked(i, ids, records.data, settings.data!.pathMode));
   const next = nextIdx >= 0 ? LESSONS[nextIdx] : undefined;
   const everyLessonDone = LESSONS.every((l) => records.data.get(l.id)?.passed);
+  const pending = resumes.data[0];
   const goalDone = s.answeredToday >= s.dailyGoal;
   const ctx: MascotContext = s.due > 0 ? "review" : s.streak.current >= 2 && s.streak.doneToday ? "streak" : "greet";
 
@@ -58,10 +61,21 @@ export default function Home() {
         </div>
       </section>
 
-      {next ? (
+      {pending ? (
+        <Link href={pending.href} className="card flex items-center justify-between gap-3 border-amber bg-amber-soft">
+          <span>
+            <span className="text-sm font-bold text-muted">▶️ Continuar aprendiendo</span>
+            <span className="block text-xl font-extrabold">{pending.title}</span>
+            <span className="text-sm">Te quedaste en: {describeResume(pending)}</span>
+          </span>
+          <span aria-hidden className="text-3xl">
+            ↩️
+          </span>
+        </Link>
+      ) : next ? (
         <Link href={`/lesson/${next.id}/`} className="card flex items-center justify-between gap-3 border-amber bg-amber-soft">
           <span>
-            <span className="text-sm font-bold text-muted">{unitById.get(next.unitId)?.emoji} Continúa donde ibas</span>
+            <span className="text-sm font-bold text-muted">{unitById.get(next.unitId)?.emoji} Continuar aprendiendo</span>
             <span className="block text-xl font-extrabold">{next.title}</span>
             <span className="text-sm">{next.objective}</span>
           </span>

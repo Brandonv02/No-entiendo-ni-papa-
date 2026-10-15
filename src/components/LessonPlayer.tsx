@@ -1,16 +1,18 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import ExerciseRunner, { type RunResult } from "./ExerciseRunner";
+import { useEffect, useMemo, useRef, useState } from "react";
+import ExerciseRunner, { type RunProgress, type RunResult } from "./ExerciseRunner";
 import Mascot from "./Mascot";
 import MascotBubble from "./MascotBubble";
 import PlayButton, { AudioBadge } from "./PlayButton";
-import { Loading } from "./ui";
+import { ErrorBox, Loading } from "./ui";
 import { DONE_GOOD, DONE_RETRY, pick } from "@/lib/copy";
 import { buildFinal, buildPractice, checkWriting, poolsFor, speechSimilarity } from "@/lib/engine";
 import { hasSpeechRecognition, listenOnce, player } from "@/lib/audio";
 import { PASS_SCORE, isUnlocked, recordLessonResult, recordPractice } from "@/lib/progress";
 import { useAudioInfo, type AudioInfo } from "@/lib/useAudio";
+import { saveLastVisited, type ResumeDoc, type RunSnapshot } from "@/lib/resume";
+import { useResumeDoc, useResumeWriter } from "@/lib/useResume";
 import { useLessonRecords, useSettings, useStudyTimer } from "@/lib/useData";
 import { LESSONS, lessonById, nextLesson, phraseById, vocabById } from "@/content";
 import type { Lesson } from "@/lib/types";
@@ -30,13 +32,12 @@ export default function LessonPlayer({ lessonId }: { lessonId: string }) {
   const settings = useSettings();
   const records = useLessonRecords();
   const audio = useAudioInfo();
-  const [stage, setStage] = useState<Stage>("learn");
-  const [attempt, setAttempt] = useState(1);
-  const [final, setFinal] = useState<RunResult | null>(null);
-  useStudyTimer(lessonId, stage !== "summary");
+  const resume = useResumeDoc("lesson", lessonId);
 
   if (!lesson) return <p role="alert">Esta lección no existe.</p>;
-  if (settings.loading || records.loading || !audio.ready) return <Loading />;
+  if (settings.loading || records.loading || !audio.ready || !resume.ready) return <Loading />;
+  // Si no se puede leer el avance guardado, no seguimos: guardar encima podría pisarlo.
+  if (resume.error) return <ErrorBox error={resume.error} onRetry={() => location.reload()} />;
 
   const idx = LESSONS.findIndex((l) => l.id === lessonId);
   const unlocked = isUnlocked(idx, LESSONS.map((l) => l.id), records.data, settings.data?.pathMode ?? "guided");
@@ -52,17 +53,34 @@ export default function LessonPlayer({ lessonId }: { lessonId: string }) {
       </div>
     );
   }
+  return <LessonBody key={lessonId} lesson={lesson} audio={audio} initial={resume.doc} />;
+}
+
+function LessonBody({ lesson, audio, initial }: { lesson: Lesson; audio: AudioInfo; initial: ResumeDoc | null }) {
+  const savedStage = STAGES.some((s) => s.id === initial?.stage && s.id !== "summary") ? (initial?.stage as Stage) : "learn";
+  const [stage, setStage] = useState<Stage>(savedStage);
+  const [attempt, setAttempt] = useState(initial?.attempt ?? 1);
+  const [final, setFinal] = useState<RunResult | null>(null);
+  const w = useResumeWriter({ kind: "lesson", id: lesson.id, title: lesson.title, href: `/lesson/${lesson.id}/`, unitId: lesson.unitId }, initial);
+  useStudyTimer(lesson.id, stage !== "summary");
+
+  // «Última lección y unidad visitadas»
+  useEffect(() => {
+    void saveLastVisited({ kind: "lesson", id: lesson.id, title: lesson.title, href: `/lesson/${lesson.id}/`, unitId: lesson.unitId }).catch(() => undefined);
+  }, [lesson]);
 
   const stageIdx = STAGES.findIndex((s) => s.id === stage);
   const go = (s: Stage) => {
     setStage(s);
+    w.update({ stage: s });
     window.scrollTo({ top: 0 });
   };
+  const run = (name: "practice" | "final") => w.get().runs[name];
 
   return (
     <div className="flex flex-col gap-4">
       <header className="safe-top flex items-center gap-3">
-        <Link href="/path/" aria-label="Salir de la lección" className="btn btn-ghost min-h-11 px-3">
+        <Link href="/path/" aria-label="Salir de la lección (tu avance se guarda)" className="btn btn-ghost min-h-11 px-3">
           ✕
         </Link>
         <div className="min-w-0 flex-1">
@@ -76,9 +94,14 @@ export default function LessonPlayer({ lessonId }: { lessonId: string }) {
           </ol>
         </div>
       </header>
+      {w.saveError && (
+        <p role="alert" className="rounded-xl bg-oops-soft p-3 text-sm font-semibold text-oops">
+          {w.saveError}
+        </p>
+      )}
 
       {stage === "learn" && <Learn lesson={lesson} audio={audio} onNext={() => go("practice")} />}
-      {stage === "practice" && <PracticeStage lesson={lesson} audio={audio} onDone={() => go("writing")} />}
+      {stage === "practice" && <PracticeStage lesson={lesson} audio={audio} snapshot={run("practice")} onSnapshot={(r) => w.setRun("practice", r)} onDone={() => go("writing")} />}
       {stage === "writing" && <WritingStage lesson={lesson} onDone={() => go("speaking")} />}
       {stage === "speaking" && <SpeakingStage lesson={lesson} audio={audio} onDone={() => go("final")} />}
       {stage === "final" && (
@@ -86,10 +109,14 @@ export default function LessonPlayer({ lessonId }: { lessonId: string }) {
           lesson={lesson}
           audio={audio}
           attempt={attempt}
+          snapshot={run("final")}
+          onSnapshot={(r) => w.setRun("final", r)}
           onDone={async (r) => {
             setFinal(r);
             await recordLessonResult(lesson.id, r.total ? r.correct / r.total : 0, r.mistakes);
-            go("summary");
+            await w.clear(); // la lección terminó: ya no hay nada «a medias»
+            setStage("summary");
+            window.scrollTo({ top: 0 });
           }}
         />
       )}
@@ -98,9 +125,12 @@ export default function LessonPlayer({ lessonId }: { lessonId: string }) {
           lesson={lesson}
           result={final}
           onRetry={() => {
-            setAttempt((a) => a + 1);
+            const next = attempt + 1;
+            setAttempt(next);
             setFinal(null);
-            go("learn");
+            setStage("learn");
+            w.update({ stage: "learn", attempt: next, runs: {} });
+            window.scrollTo({ top: 0 });
           }}
         />
       )}
@@ -261,12 +291,10 @@ function DialogPlayer({ lesson, audio }: { lesson: Lesson; audio: AudioInfo }) {
 }
 
 // ---------- Practicar ----------
-function PracticeStage({ lesson, audio, onDone }: { lesson: Lesson; audio: AudioInfo; onDone: () => void }) {
-  const exercises = useMemo(() => {
-    const pools = poolsFor(LESSONS.filter((l) => l.unitId === lesson.unitId));
-    return buildPractice(lesson, pools, audio.canPlay);
-  }, [lesson, audio.canPlay]);
-  const [res, setRes] = useState<RunResult | null>(null);
+function PracticeStage({ lesson, audio, snapshot, onSnapshot, onDone }: { lesson: Lesson; audio: AudioInfo; snapshot: RunSnapshot | undefined; onSnapshot: (r: RunSnapshot) => void; onDone: () => void }) {
+  // Si hay avance guardado se usa SU lista de ejercicios (no se regenera): así el índice siempre coincide.
+  const [exercises] = useState(() => snapshot?.exercises ?? buildPractice(lesson, poolsFor(LESSONS.filter((l) => l.unitId === lesson.unitId)), audio.canPlay));
+  const [res, setRes] = useState<RunResult | null>(() => (snapshot && snapshot.index >= snapshot.exercises.length ? { correct: snapshot.correct, total: snapshot.exercises.length - snapshot.skipped, mistakes: snapshot.mistakes } : null));
   if (res)
     return (
       <div className="card text-center">
@@ -280,7 +308,16 @@ function PracticeStage({ lesson, audio, onDone }: { lesson: Lesson; audio: Audio
         </button>
       </div>
     );
-  return <ExerciseRunner exercises={exercises} lessonId={lesson.id} audio={audio} onFinish={setRes} />;
+  return (
+    <ExerciseRunner
+      exercises={exercises}
+      lessonId={lesson.id}
+      audio={audio}
+      {...(snapshot ? { initial: { index: snapshot.index, correct: snapshot.correct, skipped: snapshot.skipped, mistakes: snapshot.mistakes } } : {})}
+      onProgress={(p: RunProgress) => onSnapshot({ exercises, ...p })}
+      onFinish={setRes}
+    />
+  );
 }
 
 // ---------- Escribir ----------
@@ -423,12 +460,30 @@ function SpeakItem({ id, en, es, audio, canRec, lessonId }: { id: string; en: st
 }
 
 // ---------- Evaluación ----------
-function FinalStage({ lesson, audio, attempt, onDone }: { lesson: Lesson; audio: AudioInfo; attempt: number; onDone: (r: RunResult) => void }) {
-  const exercises = useMemo(() => buildFinal(lesson, poolsFor(LESSONS.filter((l) => l.unitId === lesson.unitId)), attempt), [lesson, attempt]);
+function FinalStage({ lesson, audio, attempt, snapshot, onSnapshot, onDone }: { lesson: Lesson; audio: AudioInfo; attempt: number; snapshot: RunSnapshot | undefined; onSnapshot: (r: RunSnapshot) => void; onDone: (r: RunResult) => void | Promise<void> }) {
+  const [exercises] = useState(() => snapshot?.exercises ?? buildFinal(lesson, poolsFor(LESSONS.filter((l) => l.unitId === lesson.unitId)), attempt));
+  // Si la evaluación ya estaba respondida pero no llegó a cerrarse (se cerró la app justo al final), se cierra ahora una sola vez.
+  const complete = !!snapshot && snapshot.index >= snapshot.exercises.length;
+  const closed = useRef(false);
+  useEffect(() => {
+    if (complete && snapshot && !closed.current) {
+      closed.current = true;
+      void onDone({ correct: snapshot.correct, total: snapshot.exercises.length - snapshot.skipped, mistakes: snapshot.mistakes });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (complete) return <Loading text="Cerrando tu evaluación…" />;
   return (
     <div className="flex flex-col gap-3">
       <p className="chip self-start">🏁 Evaluación final · necesitas {Math.round(PASS_SCORE * 100)} %</p>
-      <ExerciseRunner exercises={exercises} lessonId={lesson.id} audio={audio} onFinish={onDone} />
+      <ExerciseRunner
+        exercises={exercises}
+        lessonId={lesson.id}
+        audio={audio}
+        {...(snapshot ? { initial: { index: snapshot.index, correct: snapshot.correct, skipped: snapshot.skipped, mistakes: snapshot.mistakes } } : {})}
+        onProgress={(p: RunProgress) => onSnapshot({ exercises, ...p })}
+        onFinish={onDone}
+      />
     </div>
   );
 }

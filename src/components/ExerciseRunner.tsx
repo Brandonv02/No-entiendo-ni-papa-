@@ -14,18 +14,30 @@ export interface RunResult {
   mistakes: string[];
 }
 
+/** Punto de la tanda: se emite tras cada respuesta para poder reanudar y se acepta al montar para continuar. */
+export interface RunProgress {
+  index: number;
+  correct: number;
+  skipped: number;
+  mistakes: string[];
+}
+
 interface Props {
   exercises: Exercise[];
   lessonId?: string;
   audio: AudioInfo;
   onFinish: (r: RunResult) => void;
+  /** Reanuda desde aquí (solo se lee al montar). */
+  initial?: RunProgress;
+  /** Se llama después de guardar cada respuesta, con el siguiente ejercicio por responder. */
+  onProgress?: (p: RunProgress) => void;
 }
 
-export default function ExerciseRunner({ exercises, lessonId, audio, onFinish }: Props) {
-  const [i, setI] = useState(0);
-  const [correct, setCorrect] = useState(0);
-  const [skipped, setSkipped] = useState(0);
-  const [mistakes, setMistakes] = useState<string[]>([]);
+export default function ExerciseRunner({ exercises, lessonId, audio, onFinish, initial, onProgress }: Props) {
+  const [i, setI] = useState(() => Math.min(initial?.index ?? 0, Math.max(0, exercises.length - 1)));
+  const [correct, setCorrect] = useState(initial?.correct ?? 0);
+  const [skipped, setSkipped] = useState(initial?.skipped ?? 0);
+  const [mistakes, setMistakes] = useState<string[]>(initial?.mistakes ?? []);
   const [feedback, setFeedback] = useState<null | { ok: boolean; msg: string; mood: Mood; detail?: string }>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hint, setHint] = useState(false);
@@ -48,7 +60,7 @@ export default function ExerciseRunner({ exercises, lessonId, audio, onFinish }:
     if (feedback) return;
     const ok = check(ex, response);
     const specific = !ok && typeof response === "string" && "optionFeedback" in ex ? ex.optionFeedback?.[response] : undefined;
-    const reaction = say(ok ? (firstDone ? "correct" : "correct") : "wrong");
+    const reaction = say(ok ? "correct" : "wrong");
     setFeedback({
       ok,
       mood: reaction.mood,
@@ -57,18 +69,22 @@ export default function ExerciseRunner({ exercises, lessonId, audio, onFinish }:
     });
     if (firstDone) return; // reintento: no cambia la puntuación ni el repaso
     setFirstDone(true);
-    if (ok) setCorrect((c) => c + 1);
-    else setMistakes((m) => [...m, ex.itemId]);
+    const nextCorrect = ok ? correct + 1 : correct;
+    const nextMistakes = ok ? mistakes : [...mistakes, ex.itemId];
+    setCorrect(nextCorrect);
+    setMistakes(nextMistakes);
     try {
       await recordAnswer(ex.itemId, ex.skill, ok, lessonId);
       setSaveError(null);
     } catch {
       setSaveError("No se pudo guardar esta respuesta en tu dispositivo. Tu progreso podría no actualizarse.");
     }
+    onProgress?.({ index: i + 1, correct: nextCorrect, skipped, mistakes: nextMistakes });
   };
 
   const skip = () => {
     setSkipped((s) => s + 1);
+    onProgress?.({ index: i + 1, correct, skipped: skipped + 1, mistakes });
     advance(correct, mistakes, skipped + 1);
   };
 

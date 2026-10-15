@@ -1,17 +1,19 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import ExerciseRunner, { type RunResult } from "./ExerciseRunner";
+import { useEffect, useRef, useState } from "react";
+import ExerciseRunner, { type RunProgress, type RunResult } from "./ExerciseRunner";
 import Mascot from "./Mascot";
 import MascotBubble from "./MascotBubble";
 import PlayButton from "./PlayButton";
-import { Loading } from "./ui";
+import { ErrorBox, Loading } from "./ui";
 import { COSTA_CATEGORIES, categoryById, expressionById, expressionsIn } from "@/content/costa";
 import { buildExpressionPractice, expressionAudioId } from "@/lib/costa";
 import { PASS_SCORE, recordLessonResult } from "@/lib/progress";
 import { say } from "@/lib/mascot";
 import { useAudioInfo, type AudioInfo } from "@/lib/useAudio";
 import { useStudyTimer } from "@/lib/useData";
+import { saveLastVisited, type ResumeDoc, type RunSnapshot } from "@/lib/resume";
+import { useResumeDoc, useResumeWriter } from "@/lib/useResume";
 import type { Expression, Register } from "@/lib/types";
 
 const REGISTER_LABEL: Record<Register, { label: string; cls: string }> = {
@@ -30,19 +32,29 @@ type Stage = "learn" | "practice" | "summary";
 export default function ExpressionSession({ categoryId }: { categoryId: string }) {
   const cat = categoryById.get(categoryId);
   const audio = useAudioInfo();
-  const [stage, setStage] = useState<Stage>("learn");
-  const [result, setResult] = useState<RunResult | null>(null);
-  const [round, setRound] = useState(1);
-  useStudyTimer(`costa-${categoryId}`, stage !== "summary");
-
+  const resume = useResumeDoc("costa", categoryId);
   if (!cat) return <p role="alert">Esta categoría no existe.</p>;
-  if (!audio.ready) return <Loading />;
+  if (!audio.ready || !resume.ready) return <Loading />;
+  if (resume.error) return <ErrorBox error={resume.error} onRetry={() => location.reload()} />;
+  return <SessionBody key={categoryId} categoryId={categoryId} audio={audio} initial={resume.doc} />;
+}
+
+function SessionBody({ categoryId, audio, initial }: { categoryId: string; audio: AudioInfo; initial: ResumeDoc | null }) {
+  const cat = categoryById.get(categoryId)!;
+  const [stage, setStage] = useState<Stage>(initial?.stage === "practice" ? "practice" : "learn");
+  const [result, setResult] = useState<RunResult | null>(null);
+  const [round, setRound] = useState(initial?.attempt ?? 1);
+  const w = useResumeWriter({ kind: "costa", id: categoryId, title: cat.title, href: `/costa/e/${categoryId}/` }, initial);
+  useStudyTimer(`costa-${categoryId}`, stage !== "summary");
+  useEffect(() => {
+    void saveLastVisited({ kind: "costa", id: categoryId, title: cat.title, href: `/costa/e/${categoryId}/` }).catch(() => undefined);
+  }, [categoryId, cat.title]);
   const exprs = expressionsIn(categoryId);
 
   return (
     <div className="flex flex-col gap-4">
       <header className="safe-top flex items-center gap-3">
-        <Link href="/costa/" aria-label="Salir al módulo" className="btn btn-ghost min-h-11 px-3">
+        <Link href="/costa/" aria-label="Salir al módulo (tu avance se guarda)" className="btn btn-ghost min-h-11 px-3">
           ✕
         </Link>
         <div className="min-w-0 flex-1">
@@ -58,6 +70,11 @@ export default function ExpressionSession({ categoryId }: { categoryId: string }
           </ol>
         </div>
       </header>
+      {w.saveError && (
+        <p role="alert" className="rounded-xl bg-oops-soft p-3 text-sm font-semibold text-oops">
+          {w.saveError}
+        </p>
+      )}
 
       {stage === "learn" && (
         <Learn
@@ -66,6 +83,7 @@ export default function ExpressionSession({ categoryId }: { categoryId: string }
           audio={audio}
           onNext={() => {
             setStage("practice");
+            w.update({ stage: "practice" });
             window.scrollTo({ top: 0 });
           }}
         />
@@ -75,9 +93,12 @@ export default function ExpressionSession({ categoryId }: { categoryId: string }
           categoryId={categoryId}
           round={round}
           audio={audio}
+          snapshot={w.get().runs.practice}
+          onSnapshot={(r) => w.setRun("practice", r)}
           onDone={async (r) => {
             setResult(r);
             await recordLessonResult(`costa-${categoryId}`, r.total ? r.correct / r.total : 0, r.mistakes);
+            await w.clear();
             setStage("summary");
             window.scrollTo({ top: 0 });
           }}
@@ -88,9 +109,11 @@ export default function ExpressionSession({ categoryId }: { categoryId: string }
           categoryId={categoryId}
           result={result}
           onRetry={() => {
-            setRound((n) => n + 1);
+            const next = round + 1;
+            setRound(next);
             setResult(null);
             setStage("practice");
+            w.update({ stage: "practice", attempt: next, runs: {} });
           }}
         />
       )}
@@ -154,9 +177,28 @@ function Learn({ title, exprs, audio, onNext }: { title: string; exprs: Expressi
   );
 }
 
-function Practice({ categoryId, round, audio, onDone }: { categoryId: string; round: number; audio: AudioInfo; onDone: (r: RunResult) => void }) {
-  const exercises = useMemo(() => buildExpressionPractice(categoryId, audio.canPlay, `costa-${categoryId}#${round}`), [categoryId, round, audio.canPlay]);
-  return <ExerciseRunner exercises={exercises} lessonId={`costa-${categoryId}`} audio={audio} onFinish={onDone} />;
+function Practice({ categoryId, round, audio, snapshot, onSnapshot, onDone }: { categoryId: string; round: number; audio: AudioInfo; snapshot: RunSnapshot | undefined; onSnapshot: (r: RunSnapshot) => void; onDone: (r: RunResult) => void | Promise<void> }) {
+  const [exercises] = useState(() => snapshot?.exercises ?? buildExpressionPractice(categoryId, audio.canPlay, `costa-${categoryId}#${round}`));
+  const complete = !!snapshot && snapshot.index >= snapshot.exercises.length;
+  const closed = useRef(false);
+  useEffect(() => {
+    if (complete && snapshot && !closed.current) {
+      closed.current = true;
+      void onDone({ correct: snapshot.correct, total: snapshot.exercises.length - snapshot.skipped, mistakes: snapshot.mistakes });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (complete) return <Loading text="Cerrando tu práctica…" />;
+  return (
+    <ExerciseRunner
+      exercises={exercises}
+      lessonId={`costa-${categoryId}`}
+      audio={audio}
+      {...(snapshot ? { initial: { index: snapshot.index, correct: snapshot.correct, skipped: snapshot.skipped, mistakes: snapshot.mistakes } } : {})}
+      onProgress={(p: RunProgress) => onSnapshot({ exercises, ...p })}
+      onFinish={onDone}
+    />
+  );
 }
 
 function Summary({ categoryId, result, onRetry }: { categoryId: string; result: RunResult; onRetry: () => void }) {

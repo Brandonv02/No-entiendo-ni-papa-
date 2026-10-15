@@ -75,10 +75,13 @@ export async function recordLessonResult(lessonId: string, score: number, mistak
 
 export async function resetProgress(): Promise<void> {
   const db = getDb();
-  await db.transaction("rw", db.items, db.lessons, db.activity, async () => {
+  await db.transaction("rw", db.settings, db.items, db.lessons, db.activity, async () => {
     await db.items.clear();
     await db.lessons.clear();
     await db.activity.clear();
+    // Avances a medias y «última visita» son parte del progreso; los ajustes (fila «settings») se conservan.
+    await db.settings.where("key").startsWith("resume:").delete();
+    await db.settings.delete("last");
   });
 }
 
@@ -91,6 +94,8 @@ export interface Stats {
   lessonsCompleted: number;
   /** Categorías de expresiones y conversaciones superadas (módulo Costa). */
   costaCompleted: number;
+  /** Momento (epoch ms) de la última respuesta registrada, o null si no hay actividad. */
+  lastActivityAt: number | null;
   accuracy: number | null; // 0..1
   learned: number;
   seen: number;
@@ -107,10 +112,12 @@ export function buildStats(items: SrsItem[], lessons: LessonRecord[], activity: 
   let correct = 0;
   let totalSeconds = 0;
   let answeredToday = 0;
+  let lastActivityAt: number | null = null;
   const skills = Object.fromEntries(SKILLS.map((s) => [s, { answered: 0, correct: 0 }])) as Record<Skill, { answered: number; correct: number }>;
   const perDay = new Map<string, { answered: number; seconds: number }>();
   for (const a of activity) {
     answered += a.total;
+    if (a.total > 0 && (lastActivityAt === null || a.ts > lastActivityAt)) lastActivityAt = a.ts;
     correct += a.correct;
     totalSeconds += a.seconds;
     if (a.date === today) answeredToday += a.total;
@@ -136,6 +143,7 @@ export function buildStats(items: SrsItem[], lessons: LessonRecord[], activity: 
     dailyGoal: settings.dailyGoal,
     totalSeconds,
     lessonsCompleted: lessons.filter((l) => l.passed && /^u\d/.test(l.lessonId)).length,
+    lastActivityAt,
     costaCompleted: lessons.filter((l) => l.passed && (l.lessonId.startsWith("costa-") || l.lessonId.startsWith("talk-"))).length,
     accuracy: answered ? correct / answered : null,
     learned: items.filter((i) => isLearned(i)).length,

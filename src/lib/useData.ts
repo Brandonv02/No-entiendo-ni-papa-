@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { getDb } from "./db";
 import { getSettings, loadStats, logStudyTime, type Stats } from "./progress";
 import type { LessonRecord, Settings, SrsItem } from "./types";
+import { listResume, loadLastVisited } from "./resume";
 import { useLive, useToday } from "./useLive";
 
 export function useSettings() {
@@ -49,4 +50,13 @@ export function useStudyTimer(lessonId?: string, active = true) {
       flush();
     };
   }, [lessonId, active]);
+}
+
+/** Avances a medias (lección, categoría o conversación), el más reciente primero. */
+export function useResumeList() {
+  return useLive(listResume, [], [] as Awaited<ReturnType<typeof listResume>>);
+}
+
+export function useLastVisited() {
+  return useLive(loadLastVisited, [], null as Awaited<ReturnType<typeof loadLastVisited>>);
 }

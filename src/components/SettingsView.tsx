@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Bar, ErrorBox, Loading } from "./ui";
 import { clearAudioCache, downloadAudio, type DownloadProgress } from "@/lib/audio";
+import { exportBackup, importBackup, parseBackup, type BackupFile, type ImportSummary } from "@/lib/backup";
 import { requestPersistence, storageEstimate, usePwa } from "@/lib/pwa";
 import { resetProgress, saveSettings } from "@/lib/progress";
 import { useAudioInfo } from "@/lib/useAudio";
@@ -22,6 +23,7 @@ export default function SettingsView() {
   const [downloading, setDownloading] = useState(false);
   const [storage, setStorage] = useState<{ usage: number; quota: number; persisted: boolean } | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const [pending, setPending] = useState<{ data: BackupFile; summary: ImportSummary } | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -43,6 +45,34 @@ export default function SettingsView() {
 
   const files = audio.manifest ? Object.keys(audio.manifest.files).length : 0;
   const cachedCount = audio.cached.size;
+
+  async function doExport() {
+    try {
+      const data = await exportBackup();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ni-papa-progreso-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setMsg(`Copia creada: ${data.items.length} palabras y frases, ${data.lessons.length} lecciones y ${data.activity.length} actividades.`);
+    } catch {
+      setMsg("No se pudo crear la copia de seguridad.");
+    }
+  }
+
+  async function pickFile(file: File | undefined) {
+    if (!file) return;
+    try {
+      setPending(parseBackup(await file.text()));
+      setMsg(null);
+    } catch (e) {
+      setPending(null);
+      setMsg(e instanceof Error ? e.message : "No se pudo leer el archivo.");
+    }
+  }
 
   async function startDownload() {
     if (!audio.manifest) return;
@@ -173,6 +203,51 @@ export default function SettingsView() {
         <Link href="/install/" className="btn btn-ghost">
           Ver guía de instalación
         </Link>
+      </section>
+
+      <section className="card flex flex-col gap-3" aria-labelledby="backup">
+        <h2 id="backup" className="text-lg font-extrabold">
+          Copia de seguridad
+        </h2>
+        <p className="text-sm text-muted">
+          Tu progreso vive solo en este dispositivo. <b>En iPhone, Safari y la app de la pantalla de inicio guardan los datos por separado</b>: si empezaste en Safari y luego instalaste la app, usa «Exportar» en uno e «Importar» en el otro.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn btn-ghost" onClick={doExport}>
+            Exportar progreso
+          </button>
+          <label className="btn btn-ghost cursor-pointer">
+            Importar progreso
+            <input type="file" accept="application/json,.json" className="sr-only" data-testid="import-file" onChange={(e) => void pickFile(e.target.files?.[0])} />
+          </label>
+        </div>
+        {pending && (
+          <div role="alertdialog" aria-label="Confirmar importación" className="rounded-2xl bg-amber-soft p-3">
+            <p className="font-bold">Esta copia tiene {pending.summary.items} palabras y frases, {pending.summary.lessons} lecciones y {pending.summary.activity} actividades.</p>
+            {pending.summary.skipped > 0 && <p className="text-sm">Se ignorarán {pending.summary.skipped} registros dañados.</p>}
+            <p className="mt-1 text-sm">Importar <b>reemplaza</b> el progreso que tienes ahora en este dispositivo.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" className="btn btn-ghost" onClick={() => setPending(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  try {
+                    await importBackup(pending.data);
+                    setPending(null);
+                    setMsg("Progreso importado.");
+                  } catch {
+                    setMsg("No se pudo importar; tu progreso actual no cambió.");
+                  }
+                }}
+              >
+                Sí, importar
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="card flex flex-col gap-3 border-oops" aria-labelledby="reset">

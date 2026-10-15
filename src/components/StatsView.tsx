@@ -31,6 +31,7 @@ export default function StatsView() {
         <Stat label="✅ Lecciones" value={`${s.lessonsCompleted}/${LESSONS.length}`} />
         <Stat label="🎯 Aciertos" value={s.accuracy === null ? "—" : `${Math.round(s.accuracy * 100)} %`} hint={answeredTotal ? `${answeredTotal} respuestas` : "Aún sin respuestas"} />
         <Stat label="📚 Aprendido" value={`${s.learned}`} hint={`de ${TOTAL_ITEMS} palabras, frases y expresiones · ${s.seen} vistas`} />
+        <Stat label="🕒 Última actividad" value={s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleDateString("es-CO", { day: "numeric", month: "short" }) : "—"} hint={s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : "Aún sin actividad"} />
         <Stat label="🌴 Costa" value={s.costaCompleted} hint="categorías y conversaciones superadas" />
         <Stat label="🔁 Por repasar" value={s.due} />
       </div>

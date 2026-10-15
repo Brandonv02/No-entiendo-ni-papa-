@@ -1,6 +1,8 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ErrorBox, Loading } from "./ui";
+import { useSettings } from "@/lib/useData";
 import Mascot from "./Mascot";
 import { SLOGAN } from "@/lib/copy";
 import { saveSettings } from "@/lib/progress";
@@ -14,11 +16,17 @@ const GOALS = [
 
 export default function Welcome() {
   const router = useRouter();
+  const existing = useSettings();
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState<Settings["pathMode"]>("guided");
   const [goal, setGoal] = useState(20);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Si ya hiciste el onboarding, esta pantalla no se repite ni toca tus ajustes.
+  useEffect(() => {
+    if (existing.data?.onboarded) router.replace("/");
+  }, [existing.data, router]);
 
   const finish = async () => {
     setBusy(true);
@@ -30,6 +38,9 @@ export default function Welcome() {
       setBusy(false);
     }
   };
+
+  if (existing.error) return <ErrorBox error={existing.error} onRetry={() => location.reload()} />;
+  if (existing.loading || existing.data?.onboarded) return <Loading />;
 
   return (
     <div className="safe-top flex min-h-[85dvh] flex-col justify-center gap-6">

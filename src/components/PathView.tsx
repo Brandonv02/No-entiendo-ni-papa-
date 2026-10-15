@@ -2,14 +2,15 @@
 import Link from "next/link";
 import { ErrorBox, Loading } from "./ui";
 import { isUnlocked } from "@/lib/progress";
-import { useLessonRecords, useSettings } from "@/lib/useData";
+import { useLastVisited, useLessonRecords, useSettings } from "@/lib/useData";
 import { LESSONS, UNITS } from "@/content";
 
 export default function PathView() {
   const settings = useSettings();
   const records = useLessonRecords();
+  const last = useLastVisited();
   if (settings.error) return <ErrorBox error={settings.error} />;
-  if (settings.loading || records.loading) return <Loading />;
+  if (settings.loading || records.loading || last.loading) return <Loading />;
   const mode = settings.data?.pathMode ?? "guided";
   const ids = LESSONS.map((l) => l.id);
 
@@ -47,6 +48,7 @@ export default function PathView() {
                       <span className="block font-extrabold">{l.title}</span>
                       <span className="block text-sm text-muted">{open ? l.objective : "Bloqueada: aprueba la anterior"}</span>
                     </span>
+                    {last.data?.kind === "lesson" && last.data.id === l.id && !rec?.passed && <span className="chip shrink-0">📍 Aquí ibas</span>}
                     {rec && rec.attempts > 0 && <span className="chip shrink-0">{Math.round(rec.bestScore * 100)}%</span>}
                   </>
                 );

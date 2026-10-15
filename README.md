@@ -49,6 +49,16 @@ Ruta `/costa/`. Aprende **qué decir según la intención, el contexto y el regi
 ## Repaso espaciado (no es IA)
 Nivel de dominio 0–5. Acierto: +1 nivel (como mucho una vez por día: varios ejercicios del mismo elemento en una sesión no inflan el intervalo), próximo repaso en `[0,1,2,4,8,16]` días. Error: −2 niveles y vuelve hoy. Prioridad = días de retraso + 5 × tasa de error + bonus por nivel bajo. Todo en `DEFAULT_SRS` (`src/lib/srs.ts`).
 
+## Persistencia y reanudación
+Todo el progreso vive en **una sola fuente**: Dexie/IndexedDB.
+- `items`, `lessons`, `activity`: resultados reales (se escriben al responder).
+- `settings` (clave/valor): ajustes y, además, el **avance a medias** (`resume:<lesson|costa|talk>:<id>`: etapa, lista exacta de ejercicios, ejercicio actual, aciertos y errores) y `last` (última lección/unidad visitada). No hizo falta migrar el esquema.
+- Al abrir cualquier pantalla se **lee primero** y se muestra «Cargando…»; nunca se pinta un cero provisional. Si la lectura falla se muestra un error y **no se escribe encima**. Los valores por defecto solo existen en memoria hasta que el usuario guarda algo.
+- El inicio ofrece **Continuar aprendiendo** (lo último a medias, o la siguiente lección). Un avance se borra al terminar la lección/categoría/conversación o con el reinicio explícito de Ajustes.
+- `/welcome/` no se repite si ya hiciste el onboarding.
+- **Safari vs app instalada (iOS):** almacenamiento separado. Ajustes › Copia de seguridad exporta/importa el progreso en JSON (importar reemplaza, con confirmación).
+- Límite: iOS puede purgar datos de webs no instaladas tras días sin uso; instalar la app y `navigator.storage.persist()` reducen el riesgo, pero no lo eliminan.
+
 ## Offline: qué se guarda y cómo
 - **App** (HTML, JS, CSS, iconos, payloads de Next): precaché versionada, cache-first. Una versión nueva espera y se aplica con el botón «Actualizar».
 - **Progreso**: IndexedDB. Esquema versionado; los ajustes se validan al leer.

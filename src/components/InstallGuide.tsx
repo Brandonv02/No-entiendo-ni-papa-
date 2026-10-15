@@ -72,6 +72,7 @@ export default function InstallGuide() {
         </h2>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
           <li>La primera visita y la primera carga necesitan internet.</li>
+          <li>En iPhone, Safari y la app de la pantalla de inicio guardan los datos por separado. Instálala antes de empezar, o pasa tu progreso con Ajustes › Copia de seguridad.</li>
           <li>iOS puede borrar los datos de una web que no se abre en mucho tiempo si no está instalada en la pantalla de inicio.</li>
           <li>El reconocimiento de voz suele no funcionar en la app instalada y, cuando funciona, necesita conexión.</li>
           <li>Con el interruptor de silencio activado, algunas voces no suenan.</li>

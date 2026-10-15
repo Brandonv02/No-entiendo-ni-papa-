@@ -28,9 +28,10 @@ const vocabByEn = new Map([...vocabById.values()].map((v) => [v.en, v]));
 const vocabByEs = new Map([...vocabById.values()].map((v) => [v.es, v]));
 
 /** Resuelve ejercicios leyendo el enunciado y buscando la respuesta en el contenido. `wrongEvery`: falla 1 de cada N a propósito. */
-export async function solveRunner(page: Page, opts: { wrongEvery?: number } = {}) {
+export async function solveRunner(page: Page, opts: { wrongEvery?: number; limit?: number } = {}) {
   let n = 0;
   for (;;) {
+    if (opts.limit !== undefined && n >= opts.limit) return n;
     const section = page.locator('section[aria-label^="Ejercicio"]');
     if (!(await section.count())) return n;
     const prompt = ((await section.locator("h2").first().textContent()) ?? "").trim();
