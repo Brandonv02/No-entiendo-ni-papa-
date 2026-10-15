@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #fff7e6;
+  --color-paper: #ffffff;
+  --color-ink: #2b1a0a;
+  --color-muted: #6b5a45;
+  --color-amber: #f59e0b;
+  --color-amber-deep: #b45309;
+  --color-amber-soft: #fde7b0;
+  --color-leaf: #2f7d32;
+  --color-leaf-soft: #dcf3d8;
+  --color-oops: #b42318;
+  --color-oops-soft: #fde4e1;
+  --color-edge: #ead9b4;
+  --font-sans: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  background: var(--color-cream);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+@layer components {
+  .card {
+    @apply rounded-3xl border-2 border-edge bg-paper p-4 shadow-[0_3px_0_0_var(--color-edge)];
+  }
+  .btn {
+    @apply inline-flex min-h-12 select-none items-center justify-center gap-2 rounded-2xl px-5 py-3 text-base font-bold transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-amber text-ink shadow-[0_4px_0_0_var(--color-amber-deep)] active:shadow-[0_2px_0_0_var(--color-amber-deep)];
+  }
+  .btn-ghost {
+    @apply border-2 border-edge bg-paper text-ink;
+  }
+  .btn-danger {
+    @apply bg-oops text-white;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full bg-amber-soft px-3 py-1 text-sm font-semibold text-ink;
+  }
+  .tile {
+    @apply min-h-12 rounded-2xl border-2 border-edge bg-paper px-4 py-2 text-base font-semibold shadow-[0_3px_0_0_var(--color-edge)] active:translate-y-px;
+  }
+}
+
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+.safe-top {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes wobble {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-4deg); }
+  75% { transform: rotate(4deg); }
+}
+.anim-pop {
+  animation: pop 180ms ease-out both;
+}
+.anim-wobble {
+  animation: wobble 500ms ease-in-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
