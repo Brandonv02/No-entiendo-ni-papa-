@@ -187,7 +187,7 @@ test("actualización segura: la versión nueva espera, se aplica al pulsar «Act
       .toEqual(["nenp-static-test-v2"]);
     // El progreso (IndexedDB) y los ajustes siguen ahí.
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: /Buen|Madrug/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /inicio/ })).toBeVisible();
   } finally {
     writeFileSync(swPath, original);
   }

@@ -1,4 +1,4 @@
-import { addDays, daysBetween } from "./dates";
+import { addDays, dayKey, daysBetween } from "./dates";
 import type { SrsItem } from "./types";
 
 /**
@@ -6,6 +6,7 @@ import type { SrsItem } from "./types";
  *
  * - Cada palabra/frase tiene un nivel de dominio 0..5.
  * - Acierto: sube 1 nivel; el próximo repaso es en INTERVALS_DAYS[nivel] días.
+ *   (Varios aciertos el MISMO día no vuelven a subir el nivel: se cuenta un avance por día.)
  * - Error: baja `wrongDrop` niveles (mínimo 0) y vuelve a tocar HOY.
  * - Prioridad al elegir qué repasar = días de retraso + errorWeight × tasa de error
  *   + bonus por nivel bajo. Así lo que más fallas sale primero.
@@ -30,7 +31,7 @@ export const DEFAULT_SRS: SrsConfig = {
 export function newItem(id: string, today: string): SrsItem {
   return {
     id,
-    kind: id.startsWith("w:") ? "word" : "phrase",
+    kind: id.startsWith("w:") ? "word" : id.startsWith("x:") ? "expr" : "phrase",
     correct: 0,
     wrong: 0,
     attempts: 0,
@@ -52,6 +53,10 @@ export function applyReview(
   if (correct) {
     next.correct += 1;
     next.streakCorrect += 1;
+    // Una palabra o frase aparece en varios ejercicios de la misma sesión: si ya se acertó hoy y
+    // su repaso ya está agendado a futuro, no escalamos el dominio otra vez (un día no basta para dominarla).
+    const alreadyScheduledToday = item.lastReview !== null && dayKey(new Date(item.lastReview)) === today && item.due > today;
+    if (alreadyScheduledToday) return next;
     next.mastery = Math.min(cfg.maxMastery, item.mastery + 1);
     const interval = cfg.intervalsDays[next.mastery] ?? cfg.intervalsDays[cfg.intervalsDays.length - 1] ?? 1;
     next.due = addDays(today, interval);

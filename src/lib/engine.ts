@@ -271,12 +271,20 @@ export function check(ex: Exercise, response: Response): boolean {
     case "choose-en":
     case "listen":
     case "cloze":
+    case "scenario":
+    case "intent":
+    case "convo":
+    case "fix":
+    case "register":
       return typeof response === "string" && normalize(response) === normalize(ex.answer);
     case "order":
     case "order-es":
       return Array.isArray(response) && normalize(response.join(" ")) === normalize(ex.answer.join(" "));
     case "type-en":
+    case "recall":
       return typeof response === "string" && ex.accepted.some((a) => sameEnglish(a, response));
+    case "explain":
+      return typeof response === "string" && checkWriting(response, ex.accepted).found.length > 0;
   }
 }
 
@@ -287,7 +295,10 @@ export function correctAnswerText(ex: Exercise): string {
     case "order-es":
       return ex.answer.join(" ");
     case "type-en":
+    case "recall":
       return ex.accepted[0] ?? "";
+    case "explain":
+      return ex.model ?? ex.accepted[0] ?? "";
     default:
       return ex.answer;
   }

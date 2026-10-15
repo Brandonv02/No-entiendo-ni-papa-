@@ -6,7 +6,7 @@ export async function onboard(page: Page) {
   await page.waitForURL("**/welcome/");
   await page.getByRole("button", { name: "¡Empecemos!" }).click();
   await page.getByRole("button", { name: "Ir a mi primera lección" }).click();
-  await expect(page.getByRole("heading", { name: /Buen|Madrug/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /inicio/ })).toBeVisible();
 }
 
 /** Espera a que el SW controle la página y la precaché esté completa. */

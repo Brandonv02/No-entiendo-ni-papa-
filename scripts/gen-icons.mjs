@@ -22,30 +22,44 @@ function inEllipse(x, y, cx, cy, rx, ry, rot = 0) {
   return u * u + v * v;
 }
 
-/** Color en coordenadas unitarias (0..1). `bleed`: fondo a sangre; si no, redondeado. */
+/** Color en coordenadas unitarias (0..1). */
 function sample(u, v, scale, rounded) {
-  // fondo
   if (rounded) {
     const r = 0.22, cx = Math.min(Math.max(u, r), 1 - r), cy = Math.min(Math.max(v, r), 1 - r);
     if ((u - cx) ** 2 + (v - cy) ** 2 > r * r) return null; // transparente
   }
   let col = v < 0.5 ? C.bg2 : C.bg;
   const x = (u - 0.5) / scale + 0.5, y = (v - 0.5) / scale + 0.5;
-  // hoja
-  if (inEllipse(x, y, 0.56, 0.2, 0.09, 0.045, -0.7) <= 1) col = C.leaf;
-  // cuerpo
-  const b = inEllipse(x, y, 0.5, 0.56, 0.31, 0.34, -0.12);
+  // cuerpo de papa
+  const b = inEllipse(x, y, 0.5, 0.66, 0.28, 0.29, -0.08);
   if (b <= 1.0) col = b > 0.9 ? C.edge : C.body;
   if (b <= 0.9) {
-    for (const [sx, sy, r] of [[0.33, 0.7, 0.03], [0.66, 0.74, 0.025], [0.4, 0.36, 0.022], [0.7, 0.4, 0.02]])
-      if ((x - sx) ** 2 + (y - sy) ** 2 < r * r) col = C.spot;
-    for (const ex of [0.4, 0.6]) {
-      if ((x - ex) ** 2 + (y - 0.5) ** 2 < 0.06 ** 2) col = C.white;
-      if ((x - ex - 0.012) ** 2 + (y - 0.505) ** 2 < 0.028 ** 2) col = C.ink;
+    for (const [sx, sy, r] of [[0.33, 0.82, 0.025], [0.67, 0.84, 0.022], [0.3, 0.7, 0.018]]) if ((x - sx) ** 2 + (y - sy) ** 2 < r * r) col = C.spot;
+    for (const ex of [0.41, 0.59]) {
+      if ((x - ex) ** 2 + (y - 0.63) ** 2 < 0.052 ** 2) col = C.white;
+      if ((x - ex - 0.01) ** 2 + (y - 0.635) ** 2 < 0.025 ** 2) col = C.ink;
     }
-    for (const cxk of [0.3, 0.7]) if ((x - cxk) ** 2 + (y - 0.62) ** 2 < 0.035 ** 2) col = C.cheek;
-    const d = Math.hypot(x - 0.5, y - 0.6);
-    if (y > 0.62 && Math.abs(d - 0.09) < 0.014) col = C.ink;
+    for (const cxk of [0.31, 0.69]) if ((x - cxk) ** 2 + (y - 0.72) ** 2 < 0.03 ** 2) col = C.cheek;
+    const d = Math.hypot(x - 0.5, y - 0.69);
+    if (y > 0.7 && Math.abs(d - 0.075) < 0.012) col = C.ink;
+  }
+  // sombrero vueltiao: copa y ala crema con bandas y rombos negros
+  const cream = hex("#f3e6bf");
+  const rot = -0.09, c = Math.cos(rot), s = Math.sin(rot);
+  const hx = (x - 0.5) * c + (y - 0.45) * s, hy = -(x - 0.5) * s + (y - 0.45) * c; // coordenadas del sombrero
+  const brim = (hx / 0.36) ** 2 + (hy / 0.085) ** 2;
+  if (brim <= 1) {
+    col = brim > 0.9 ? C.ink : cream;
+    const ang = Math.atan2(hy / 0.085, hx / 0.36);
+    if (brim > 0.5 && brim < 0.68 && Math.sin(ang * 22) > -0.2) col = C.ink;
+    if (brim > 0.3 && brim < 0.34) col = C.ink;
+  }
+  const crownTop = (hx / 0.125) ** 2 + ((hy + 0.115) / 0.07) ** 2;
+  if ((Math.abs(hx) < 0.125 && hy > -0.115 && hy < 0.02) || crownTop <= 1) {
+    col = cream;
+    if (Math.abs(hx) > 0.118) col = C.ink;
+    if ((hy > -0.075 && hy < -0.05) || (hy > -0.012 && hy < 0.012)) col = C.ink;
+    for (const dx of [-0.06, -0.03, 0, 0.03, 0.06]) if (Math.abs(hx - dx) + Math.abs(hy + 0.031) < 0.014) col = C.ink;
   }
   return col;
 }

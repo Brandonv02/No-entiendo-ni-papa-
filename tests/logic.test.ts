@@ -57,21 +57,44 @@ describe("repaso espaciado", () => {
     expect(a.attempts).toBe(1);
     expect(a.lastReview).toBe(now.getTime());
   });
-  it("los intervalos crecen con aciertos seguidos", () => {
+  it("los intervalos crecen con aciertos en días distintos", () => {
     let it = newItem("w:x", today);
     const dues: string[] = [];
     for (let i = 0; i < 4; i++) {
-      it = applyReview(it, true, now, today);
+      const day = new Date(2026, 2, 10 + i * 8, 10); // cada repaso llega cuando toca
+      it = applyReview(it, true, day, dayKey(day));
       dues.push(it.due);
     }
-    expect(dues).toEqual(["2026-03-11", "2026-03-12", "2026-03-14", "2026-03-18"]);
+    expect(dues).toEqual(["2026-03-11", "2026-03-20", "2026-03-30", "2026-04-11"]);
+  });
+  it("varios aciertos el mismo día no escalan el dominio (sesión con varios ejercicios del mismo elemento)", () => {
+    let it = newItem("x:s1", today);
+    for (let i = 0; i < 6; i++) it = applyReview(it, true, now, today);
+    expect(it.mastery).toBe(1);
+    expect(it.due).toBe("2026-03-11");
+    expect(it.correct).toBe(6);
+    expect(it.attempts).toBe(6);
+  });
+  it("un error el mismo día vuelve a agendar hoy y un acierto posterior lo recupera sin saltar niveles", () => {
+    let it = newItem("x:s1", today);
+    it = applyReview(it, true, now, today);
+    it = applyReview(it, false, now, today);
+    expect(it.due).toBe(today);
+    it = applyReview(it, true, now, today);
+    expect(it.mastery).toBe(1);
+    expect(it.due).toBe("2026-03-11");
   });
   it("un error baja el dominio y vuelve a tocar hoy", () => {
     let it = newItem("p:x", today);
-    for (let i = 0; i < 3; i++) it = applyReview(it, true, now, today);
-    const bad = applyReview(it, false, now, today);
+    for (let i = 0; i < 3; i++) {
+      const day = new Date(2026, 2, 10 + i * 5, 10);
+      it = applyReview(it, true, day, dayKey(day));
+    }
+    expect(it.mastery).toBe(3);
+    const later = new Date(2026, 2, 30, 10);
+    const bad = applyReview(it, false, later, dayKey(later));
     expect(bad.mastery).toBe(1);
-    expect(bad.due).toBe(today);
+    expect(bad.due).toBe(dayKey(later));
     expect(bad.wrong).toBe(1);
     expect(bad.streakCorrect).toBe(0);
   });

@@ -23,7 +23,7 @@ npx playwright test    # E2E en Edge/Chrome del sistema; requiere `npm run build
 ```
 src/app/            rutas (/, /welcome, /path, /lesson/[id], /review, /stats, /settings, /install)
 src/components/     UI (Client Components solo donde hay interacción)
-src/content/        12 unidades × 2 lecciones (24), datos tipados
+src/content/        12 unidades × 2 lecciones (24); costa.ts (expresiones) y conversations.ts
 src/lib/engine.ts   generación y corrección de ejercicios (pura)
 src/lib/srs.ts      repaso espaciado (reglas locales, configurable)
 src/lib/streak.ts   racha con fechas locales
@@ -35,8 +35,19 @@ src/sw/             plantilla del Service Worker (scripts/gen-sw.mjs la completa
 tests/ e2e/         vitest y Playwright
 ```
 
+## De la Costa pa'l mundo (módulo de expresiones y conversaciones)
+Ruta `/costa/`. Aprende **qué decir según la intención, el contexto y el registro** (no traducción literal).
+- **8 categorías · 24 expresiones** (saludos, amigos, comida, compras, trabajo y tecnología, viajes, colombianas, formal vs informal). Cada una trae significado contextual, situación, registro (informal/neutral/formal), 3 equivalencias con su matiz, ejemplos, audio (voz del dispositivo o archivo) y errores frecuentes de hispanohablantes.
+- **Actividades** (en el mismo `ExerciseRunner`): respuesta natural en una situación, intención de una frase (escuchada o leída), completar conversación, ordenar, corregir error frecuente, formal vs informal, producir, explicar en inglés sencillo y recordar sin ver la traducción (repaso). Pista opcional, retroalimentación específica por opción y «Intentar de nuevo» (solo el primer intento puntúa).
+- **5 conversaciones ramificadas** (Cartagena, restaurante, tienda, amigo, hotel): el personaje responde según tu elección, se explica por qué funciona, la forma más natural y cómo seguir. Reglas locales: funcionan sin internet. Pedir que repitan no penaliza.
+- **Ampliar sin tocar el motor:** añade objetos a `src/content/costa.ts` (expresiones) o `src/content/conversations.ts` (diálogos). Los tests validan la integridad de los datos.
+- **Progreso:** reutiliza Dexie sin cambiar el esquema (`lessons`: `costa-<categoría>`, `talk-<conversación>`; `items`: `x:<expresión>`). Las expresiones fallidas entran al Repaso.
+
+## Mascota «Papito» (papa costeña con sombrero vueltiao)
+`src/components/Mascot.tsx` (SVG propio, sin imágenes externas; 9 estados: wave, happy, cheer, think, hint, oops, cool, sleepy, party). `src/lib/mascot.ts` define los mensajes por contexto (saludar, explicar, acierto, error, pista, misión, racha, repasar, offline, despedida, vacío, error) y evita repetir el último mensaje; ampliar = añadir frases al banco. Los iconos de la app (`public/icons`) se regeneran con `node scripts/gen-icons.mjs`.
+
 ## Repaso espaciado (no es IA)
-Nivel de dominio 0–5. Acierto: +1 nivel, próximo repaso en `[0,1,2,4,8,16]` días. Error: −2 niveles y vuelve hoy. Prioridad = días de retraso + 5 × tasa de error + bonus por nivel bajo. Todo en `DEFAULT_SRS` (`src/lib/srs.ts`).
+Nivel de dominio 0–5. Acierto: +1 nivel (como mucho una vez por día: varios ejercicios del mismo elemento en una sesión no inflan el intervalo), próximo repaso en `[0,1,2,4,8,16]` días. Error: −2 niveles y vuelve hoy. Prioridad = días de retraso + 5 × tasa de error + bonus por nivel bajo. Todo en `DEFAULT_SRS` (`src/lib/srs.ts`).
 
 ## Offline: qué se guarda y cómo
 - **App** (HTML, JS, CSS, iconos, payloads de Next): precaché versionada, cache-first. Una versión nueva espera y se aplica con el botón «Actualizar».

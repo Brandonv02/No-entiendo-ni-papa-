@@ -85,6 +85,23 @@ body {
   25% { transform: rotate(-4deg); }
   75% { transform: rotate(4deg); }
 }
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes waveArm {
+  0%, 100% { transform: rotate(0); }
+  30% { transform: rotate(-16deg); }
+  70% { transform: rotate(12deg); }
+}
+.anim-bob {
+  animation: bob 2.6s ease-in-out infinite;
+}
+.wave-arm {
+  transform-box: fill-box;
+  transform-origin: 20% 90%;
+  animation: waveArm 0.9s ease-in-out 3;
+}
 .anim-pop {
   animation: pop 180ms ease-out both;
 }

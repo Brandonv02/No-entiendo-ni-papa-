@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import Mascot from "./Mascot";
 import PlayButton from "./PlayButton";
-import { CORRECT, WRONG, pick } from "@/lib/copy";
+import { say, type Mood } from "@/lib/mascot";
 import { check, correctAnswerText, type Response } from "@/lib/engine";
 import { recordAnswer } from "@/lib/progress";
 import type { AudioInfo } from "@/lib/useAudio";
@@ -26,14 +26,20 @@ export default function ExerciseRunner({ exercises, lessonId, audio, onFinish }:
   const [correct, setCorrect] = useState(0);
   const [skipped, setSkipped] = useState(0);
   const [mistakes, setMistakes] = useState<string[]>([]);
-  const [feedback, setFeedback] = useState<null | { ok: boolean; msg: string }>(null);
+  const [feedback, setFeedback] = useState<null | { ok: boolean; msg: string; mood: Mood; detail?: string }>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [hint, setHint] = useState(false);
+  const [retries, setRetries] = useState(0); // reinicia la respuesta al reintentar
+  const [firstDone, setFirstDone] = useState(false); // solo el primer intento cuenta y se guarda
 
   const ex = exercises[i];
   if (!ex) return null;
 
   const advance = (nextCorrect = correct, nextMistakes = mistakes, nextSkipped = skipped) => {
     setFeedback(null);
+    setHint(false);
+    setFirstDone(false);
+    setRetries(0);
     if (i + 1 >= exercises.length) onFinish({ correct: nextCorrect, total: exercises.length - nextSkipped, mistakes: nextMistakes });
     else setI(i + 1);
   };
@@ -41,7 +47,16 @@ export default function ExerciseRunner({ exercises, lessonId, audio, onFinish }:
   const submit = async (response: Response) => {
     if (feedback) return;
     const ok = check(ex, response);
-    setFeedback({ ok, msg: ok ? pick(CORRECT, i + correct) : `${pick(WRONG, i)} Respuesta: ${correctAnswerText(ex)}` });
+    const specific = !ok && typeof response === "string" && "optionFeedback" in ex ? ex.optionFeedback?.[response] : undefined;
+    const reaction = say(ok ? (firstDone ? "correct" : "correct") : "wrong");
+    setFeedback({
+      ok,
+      mood: reaction.mood,
+      msg: ok && firstDone ? "¡Ahora sí! Ya lo tienes." : reaction.text,
+      ...(!ok ? { detail: [specific, `Respuesta: ${correctAnswerText(ex)}`].filter(Boolean).join(" ") } : {}),
+    });
+    if (firstDone) return; // reintento: no cambia la puntuación ni el repaso
+    setFirstDone(true);
     if (ok) setCorrect((c) => c + 1);
     else setMistakes((m) => [...m, ex.itemId]);
     try {
@@ -57,8 +72,11 @@ export default function ExerciseRunner({ exercises, lessonId, audio, onFinish }:
     advance(correct, mistakes, skipped + 1);
   };
 
+  const audioId = ex.audioId ?? ex.itemId.slice(2);
+  const listenKind = ex.kind === "listen" || (ex.kind === "intent" && !!ex.speak);
+
   return (
-    <section aria-label={`Ejercicio ${i + 1} de ${exercises.length}`} className="flex flex-col gap-4">
+    <section data-ex-id={ex.id} aria-label={`Ejercicio ${i + 1} de ${exercises.length}`} className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <div role="progressbar" aria-valuemin={0} aria-valuemax={exercises.length} aria-valuenow={i} aria-label="Progreso del ejercicio" className="h-3 flex-1 overflow-hidden rounded-full bg-amber-soft">
           <div className="h-full rounded-full bg-amber transition-[width]" style={{ width: `${(i / exercises.length) * 100}%` }} />
@@ -69,19 +87,35 @@ export default function ExerciseRunner({ exercises, lessonId, audio, onFinish }:
       </div>
 
       <h2 className="text-xl font-extrabold">{ex.prompt}</h2>
+      {ex.context && <p className="card bg-cream text-[15px] font-semibold">{ex.context}</p>}
       {"sentence" in ex && ex.sentence && <p className="card text-center text-xl font-bold" aria-label={`Frase: ${ex.sentence.replace("_____", "espacio en blanco")}`}>{ex.sentence}</p>}
 
-      {ex.kind === "listen" && (
+      {listenKind && (
         <div className="card flex flex-col gap-2">
-          <PlayButton id={ex.itemId.slice(2)} text={ex.speak ?? ""} info={audio} />
+          <PlayButton id={audioId} text={ex.speak ?? ""} info={audio} />
           <button type="button" className="text-left text-sm font-semibold text-muted underline" onClick={skip} disabled={!!feedback}>
             No puedo escuchar ahora (omitir sin penalización)
           </button>
         </div>
       )}
-      {ex.speak && ex.kind !== "listen" && feedback && <PlayButton id={ex.itemId.slice(2)} text={ex.speak} info={audio} compact />}
+      {ex.speak && !listenKind && feedback && <PlayButton id={audioId} text={ex.speak} info={audio} compact />}
 
-      <Answer key={ex.id} ex={ex} locked={!!feedback} onSubmit={submit} />
+      {ex.hint && !feedback && (
+        <div>
+          {!hint ? (
+            <button type="button" className="min-h-11 text-sm font-bold text-amber-deep underline" onClick={() => setHint(true)}>
+              💡 Dame una pista
+            </button>
+          ) : (
+            <div className="anim-pop flex items-center gap-2 rounded-2xl bg-amber-soft p-3">
+              <Mascot mood="hint" size={44} />
+              <p className="text-sm font-semibold">{ex.hint}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <Answer key={`${ex.id}#${retries}`} ex={ex} locked={!!feedback} onSubmit={submit} />
 
       {saveError && (
         <p role="alert" className="rounded-xl bg-oops-soft p-3 text-sm font-semibold text-oops">
@@ -92,20 +126,35 @@ export default function ExerciseRunner({ exercises, lessonId, audio, onFinish }:
       <div aria-live="polite" className="min-h-0">
         {feedback && (
           <div className={`anim-pop flex items-center gap-3 rounded-3xl p-4 ${feedback.ok ? "bg-leaf-soft" : "bg-oops-soft"}`}>
-            <Mascot mood={feedback.ok ? "party" : "oops"} size={56} />
+            <Mascot mood={feedback.mood} size={56} />
             <div>
               <p className={`font-extrabold ${feedback.ok ? "text-leaf" : "text-oops"}`}>{feedback.ok ? "¡Correcto!" : "Todavía no"}</p>
               <p className="text-sm">{feedback.msg}</p>
-              {!feedback.ok && ex.explanation && <p className="mt-1 text-sm text-muted">{ex.explanation}</p>}
+              {feedback.detail && <p className="mt-1 text-sm font-semibold">{feedback.detail}</p>}
+              {ex.explanation && (!feedback.ok || "optionFeedback" in ex || ex.kind === "explain") && <p className="mt-1 text-sm text-muted">{ex.explanation}</p>}
             </div>
           </div>
         )}
       </div>
 
       {feedback && (
-        <button type="button" className="btn btn-primary" autoFocus onClick={() => advance()}>
-          {i + 1 >= exercises.length ? "Terminar" : "Continuar"}
-        </button>
+        <div className="grid gap-2">
+          <button type="button" className="btn btn-primary" autoFocus onClick={() => advance()}>
+            {i + 1 >= exercises.length ? "Terminar" : "Continuar"}
+          </button>
+          {!feedback.ok && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setFeedback(null);
+                setRetries((r) => r + 1);
+              }}
+            >
+              Intentar de nuevo
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

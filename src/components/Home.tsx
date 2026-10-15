@@ -2,9 +2,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import Mascot, { type Mood } from "./Mascot";
+import MascotBubble from "./MascotBubble";
 import { ErrorBox, Loading, Ring, Stat } from "./ui";
-import { greeting } from "@/lib/copy";
+import { usePwa } from "@/lib/pwa";
+import type { MascotContext } from "@/lib/mascot";
 import { isUnlocked } from "@/lib/progress";
 import { useLessonRecords, useSettings, useStats } from "@/lib/useData";
 import { LESSONS, unitById } from "@/content";
@@ -15,6 +16,7 @@ export default function Home() {
   const settings = useSettings();
   const stats = useStats();
   const records = useLessonRecords();
+  const pwa = usePwa();
 
   useEffect(() => {
     if (settings.data && !settings.data.onboarded) router.replace("/welcome/");
@@ -30,19 +32,17 @@ export default function Home() {
   const next = nextIdx >= 0 ? LESSONS[nextIdx] : undefined;
   const everyLessonDone = LESSONS.every((l) => records.data.get(l.id)?.passed);
   const goalDone = s.answeredToday >= s.dailyGoal;
-  const mood: Mood = goalDone ? "party" : s.streak.current > 0 && !s.streak.doneToday ? "think" : "happy";
-  const hour = new Date().getHours();
+  const ctx: MascotContext = s.due > 0 ? "review" : s.streak.current >= 2 && s.streak.doneToday ? "streak" : "greet";
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex items-center gap-3">
-        <Mascot mood={mood} size={84} label="Papito" />
-        <div>
-          <h1 className="text-2xl font-extrabold">{greeting(hour)}</h1>
-          <p className="text-muted">
-            {goalDone ? "¡Meta del día cumplida! Todo lo demás es ganancia." : s.streak.current > 0 && !s.streak.doneToday ? "Tu racha te espera: estudia hoy para no perderla." : SLOGAN}
-          </p>
-        </div>
+      <header>
+        <h1 className="sr-only">No Entiendo Ni Papa: inicio</h1>
+        <MascotBubble context={ctx} size={88} />
+        <p className="mt-2 text-sm font-semibold text-muted">
+          {SLOGAN}
+          {pwa.offlineReady && " · 📴 Funciona sin conexión"}
+        </p>
       </header>
 
       <section className="card flex items-center gap-4" aria-label="Meta diaria">
@@ -75,6 +75,17 @@ export default function Home() {
           <p className="text-muted">Repasa para no olvidar. Más contenido (A2) llegará pronto.</p>
         </div>
       ) : null}
+
+      <Link href="/costa/" className="card flex items-center justify-between gap-3 bg-gradient-to-br from-leaf-soft to-paper">
+        <span>
+          <span className="block text-sm font-bold text-muted">🌴 Nuevo módulo</span>
+          <span className="block text-xl font-extrabold">De la Costa pa&apos;l mundo</span>
+          <span className="text-sm">Expresiones colombianas y conversaciones con decisiones.</span>
+        </span>
+        <span aria-hidden className="text-3xl">
+          ➡️
+        </span>
+      </Link>
 
       <Link href="/review/" className="card flex items-center justify-between gap-3">
         <span>

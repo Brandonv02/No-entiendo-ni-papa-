@@ -30,7 +30,8 @@ export default function StatsView() {
         <Stat label="⏱️ Tiempo de estudio" value={formatDuration(s.totalSeconds)} />
         <Stat label="✅ Lecciones" value={`${s.lessonsCompleted}/${LESSONS.length}`} />
         <Stat label="🎯 Aciertos" value={s.accuracy === null ? "—" : `${Math.round(s.accuracy * 100)} %`} hint={answeredTotal ? `${answeredTotal} respuestas` : "Aún sin respuestas"} />
-        <Stat label="📚 Aprendido" value={`${s.learned}`} hint={`de ${TOTAL_ITEMS} palabras y frases · ${s.seen} vistas`} />
+        <Stat label="📚 Aprendido" value={`${s.learned}`} hint={`de ${TOTAL_ITEMS} palabras, frases y expresiones · ${s.seen} vistas`} />
+        <Stat label="🌴 Costa" value={s.costaCompleted} hint="categorías y conversaciones superadas" />
         <Stat label="🔁 Por repasar" value={s.due} />
       </div>
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import ExerciseRunner, { type RunResult } from "./ExerciseRunner";
 import Mascot from "./Mascot";
+import MascotBubble from "./MascotBubble";
 import PlayButton, { AudioBadge } from "./PlayButton";
 import { Loading } from "./ui";
 import { DONE_GOOD, DONE_RETRY, pick } from "@/lib/copy";
@@ -469,6 +470,8 @@ function Summary({ lesson, result, onRetry }: { lesson: Lesson; result: RunResul
       ) : (
         <p className="card">Sin errores en la evaluación. ¡Impecable!</p>
       )}
+
+      <MascotBubble context="farewell" />
 
       <div className="grid gap-2">
         {passed && next && (

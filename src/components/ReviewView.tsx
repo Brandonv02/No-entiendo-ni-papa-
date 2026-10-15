@@ -5,6 +5,8 @@ import ExerciseRunner, { type RunResult } from "./ExerciseRunner";
 import Mascot from "./Mascot";
 import PlayButton from "./PlayButton";
 import { Empty, ErrorBox, Loading } from "./ui";
+import MascotBubble from "./MascotBubble";
+import { buildExpressionReview } from "@/lib/costa";
 import { buildReview, poolsFor } from "@/lib/engine";
 import { recordAnswer } from "@/lib/progress";
 import { pickDue } from "@/lib/srs";
@@ -25,7 +27,13 @@ export default function ReviewView() {
 
   const due = useMemo(() => pickDue(items, today, SESSION_SIZE), [items, today]);
   const exercises = useMemo(
-    () => (mode === "session" ? buildReview(due, vocabById, phraseById, poolsFor(LESSONS), `${today}#${seed}`) : []),
+    () =>
+      mode === "session"
+        ? [
+            ...buildReview(due.filter((d) => d.kind !== "expr"), vocabById, phraseById, poolsFor(LESSONS), `${today}#${seed}`),
+            ...buildExpressionReview(due.filter((d) => d.kind === "expr"), `${today}#${seed}`),
+          ]
+        : [],
     // La sesión se congela al empezar: no se recalcula mientras respondes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, seed],
@@ -43,6 +51,7 @@ export default function ReviewView() {
             Repaso terminado: {result.correct} de {result.total}
           </h1>
           <p className="text-muted">Lo que fallaste volverá a aparecer hoy; lo que acertaste, más adelante.</p>
+          <MascotBubble context="farewell" className="mt-3 text-left" />
           <button type="button" className="btn btn-primary mt-4" onClick={() => { setResult(null); setMode("menu"); }}>
             Listo
           </button>

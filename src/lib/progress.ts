@@ -89,6 +89,8 @@ export interface Stats {
   dailyGoal: number;
   totalSeconds: number;
   lessonsCompleted: number;
+  /** Categorías de expresiones y conversaciones superadas (módulo Costa). */
+  costaCompleted: number;
   accuracy: number | null; // 0..1
   learned: number;
   seen: number;
@@ -133,7 +135,8 @@ export function buildStats(items: SrsItem[], lessons: LessonRecord[], activity: 
     answeredToday,
     dailyGoal: settings.dailyGoal,
     totalSeconds,
-    lessonsCompleted: lessons.filter((l) => l.passed).length,
+    lessonsCompleted: lessons.filter((l) => l.passed && /^u\d/.test(l.lessonId)).length,
+    costaCompleted: lessons.filter((l) => l.passed && (l.lessonId.startsWith("costa-") || l.lessonId.startsWith("talk-"))).length,
     accuracy: answered ? correct / answered : null,
     learned: items.filter((i) => isLearned(i)).length,
     seen: items.length,

@@ -36,7 +36,7 @@ export default function Welcome() {
       {step === 0 ? (
         <>
           <div className="flex flex-col items-center gap-3 text-center">
-            <Mascot mood="happy" size={140} label="Papito, la mascota" />
+            <Mascot mood="wave" size={160} label="Papito, la papa costeña con sombrero vueltiao" />
             <h1 className="text-4xl font-black leading-tight">No Entiendo Ni Papa</h1>
             <p className="text-lg font-semibold text-muted">{SLOGAN}</p>
             <p className="max-w-sm">Soy Papito. Te acompaño a aprender inglés desde cero: escuchar, hablar, leer y escribir. Sin presión y con buen humor.</p>

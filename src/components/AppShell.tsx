@@ -8,6 +8,7 @@ import { useOnline } from "@/lib/useLive";
 const NAV = [
   { href: "/", label: "Inicio", icon: "🏠" },
   { href: "/path/", label: "Ruta", icon: "🗺️" },
+  { href: "/costa/", label: "Costa", icon: "🌴" },
   { href: "/review/", label: "Repaso", icon: "🔁" },
   { href: "/stats/", label: "Progreso", icon: "📈" },
   { href: "/settings/", label: "Ajustes", icon: "⚙️" },
@@ -45,7 +46,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     registerServiceWorker();
     void requestPersistence();
   }, []);
-  const focus = path.startsWith("/welcome") || path.startsWith("/lesson");
+  const focus = path.startsWith("/welcome") || path.startsWith("/lesson") || path.startsWith("/costa/e/") || path.startsWith("/costa/c/");
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col">

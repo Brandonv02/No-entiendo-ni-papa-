@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Mascot, { type Mood } from "./Mascot";
 
 export function Ring({ value, max, size = 96, label }: { value: number; max: number; size?: number; label: string }) {
   const pct = Math.min(1, max ? value / max : 0);
@@ -41,7 +42,10 @@ export function Loading({ text = "Cargando…" }: { text?: string }) {
 export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => void }) {
   return (
     <div role="alert" className="card border-oops bg-oops-soft">
-      <p className="font-bold text-oops">Algo falló al leer tus datos guardados.</p>
+      <div className="flex items-center gap-3">
+        <Mascot mood="oops" size={56} />
+        <p className="font-bold text-oops">Uy, algo se enredó al leer tus datos guardados.</p>
+      </div>
       <p className="mt-1 text-sm">{error.message}</p>
       <p className="mt-1 text-sm">Puede pasar en modo privado de Safari. Cierra y abre la app; si sigue, revisa Ajustes › Safari › Avanzado.</p>
       {onRetry && (
@@ -53,12 +57,12 @@ export function ErrorBox({ error, onRetry }: { error: Error; onRetry?: () => voi
   );
 }
 
-export function Empty({ emoji, title, children }: { emoji: string; title: string; children?: ReactNode }) {
+export function Empty({ emoji, title, children, mood = "sleepy" }: { emoji?: string; title: string; children?: ReactNode; mood?: Mood }) {
   return (
     <div className="card text-center">
-      <p className="text-4xl" aria-hidden>
-        {emoji}
-      </p>
+      <div className="flex justify-center">
+        <Mascot mood={mood} size={84} />
+      </div>
       <h2 className="mt-2 text-lg font-extrabold">{title}</h2>
       {children && <div className="mt-1 text-muted">{children}</div>}
     </div>
