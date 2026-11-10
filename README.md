@@ -35,6 +35,15 @@ src/sw/             plantilla del Service Worker (scripts/gen-sw.mjs la completa
 tests/ e2e/         vitest y Playwright
 ```
 
+## Hablar: conversaciones tipo entrevista (sin IA)
+Pestaña **Hablar** (`/talk/`). Un personaje te hace preguntas y respondes **con tus propias palabras**, escribiendo o dictando con el micrófono del teclado del iPhone (o con el botón 🎤 donde el navegador tenga reconocimiento de voz). Funciona sin internet y sin costo.
+- **8 conversaciones** agrupadas en Trabajo (entrevista de trabajo, primer día, llamada con un cliente, reunión con tu jefa, pedir un día libre), Vida social (Papito te entrevista, conocer a alguien en un café) y Viajes (migración en el aeropuerto). Están en `src/content/interviews.ts`.
+- **Motor local** (`src/lib/talk.ts`, reglas deterministas): detecta si respondiste en español, reconoce el tipo de respuesta (nombre, lugar, número, trabajo, gustos, sí/no, motivo, duración, fecha/hora, estado de ánimo o frase libre), extrae tu dato para que el personaje reaccione («Nice to meet you, Laura!»), responde si le devuelves la pregunta («And you?») y detecta errores frecuentes de hispanohablantes («I have 28 years» → «I'm 28 years old») sin cortar la charla.
+- Si no te entiende, pide aclarar; tras 2 intentos sigue y te muestra un ejemplo. Botón **Ayuda** con pista y frase modelo.
+- Resumen final con lo que conviene corregir; el resultado se guarda (`int-<id>` en `lessons`) y la conversación a medias se reanuda (`resume:interview:<id>`).
+- **Límite:** entiende respuestas típicas, no cualquier frase, y la corrección cubre errores frecuentes, no toda la gramática.
+- **Ampliar:** añade una entrevista en `interviews.ts` (pregunta, tipo esperado, reacción, pista y modelo). Los tests verifican que cada respuesta modelo se entienda.
+
 ## De la Costa pa'l mundo (módulo de expresiones y conversaciones)
 Ruta `/costa/`. Aprende **qué decir según la intención, el contexto y el registro** (no traducción literal).
 - **8 categorías · 24 expresiones** (saludos, amigos, comida, compras, trabajo y tecnología, viajes, colombianas, formal vs informal). Cada una trae significado contextual, situación, registro (informal/neutral/formal), 3 equivalencias con su matiz, ejemplos, audio (voz del dispositivo o archivo) y errores frecuentes de hispanohablantes.

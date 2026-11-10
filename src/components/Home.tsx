@@ -48,6 +48,17 @@ export default function Home() {
         </p>
       </header>
 
+      <Link href="/talk/" className="card flex items-center justify-between gap-3 border-leaf bg-gradient-to-br from-leaf-soft to-paper">
+        <span>
+          <span className="block text-sm font-bold text-muted">🗣️ Hablar</span>
+          <span className="block text-xl font-extrabold">Conversa con alguien</span>
+          <span className="text-sm">Entrevistas y charlas: responde con tus propias palabras.</span>
+        </span>
+        <span aria-hidden className="text-3xl">
+          💬
+        </span>
+      </Link>
+
       <section className="card flex items-center gap-4" aria-label="Meta diaria">
         <Ring value={s.answeredToday} max={s.dailyGoal} label={`Meta diaria: ${s.answeredToday} de ${s.dailyGoal} ejercicios`} />
         <div>
@@ -113,6 +124,9 @@ export default function Home() {
         <Stat label="Lecciones" value={`${s.lessonsCompleted}/${LESSONS.length}`} />
         <Stat label="Vocabulario aprendido" value={s.learned} />
       </div>
+      <Link href="/stats/" className="btn btn-ghost">
+        📈 Ver mi progreso
+      </Link>
     </div>
   );
 }

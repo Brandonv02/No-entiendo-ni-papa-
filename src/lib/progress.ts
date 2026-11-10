@@ -144,7 +144,7 @@ export function buildStats(items: SrsItem[], lessons: LessonRecord[], activity: 
     totalSeconds,
     lessonsCompleted: lessons.filter((l) => l.passed && /^u\d/.test(l.lessonId)).length,
     lastActivityAt,
-    costaCompleted: lessons.filter((l) => l.passed && (l.lessonId.startsWith("costa-") || l.lessonId.startsWith("talk-"))).length,
+    costaCompleted: lessons.filter((l) => l.passed && (l.lessonId.startsWith("costa-") || l.lessonId.startsWith("talk-") || l.lessonId.startsWith("int-"))).length,
     accuracy: answered ? correct / answered : null,
     learned: items.filter((i) => isLearned(i)).length,
     seen: items.length,

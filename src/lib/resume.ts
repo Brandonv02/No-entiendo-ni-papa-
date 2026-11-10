@@ -9,7 +9,7 @@ import type { Exercise } from "./types";
  */
 export const RESUME_VERSION = 1;
 
-export type ResumeKind = "lesson" | "costa" | "talk";
+export type ResumeKind = "lesson" | "costa" | "talk" | "interview";
 
 /** Estado de una tanda de ejercicios: la lista exacta (para no depender de que se regenere igual) y el punto en que va. */
 export interface RunSnapshot {
@@ -67,7 +67,7 @@ function validSnapshot(x: unknown): x is RunSnapshot {
 /** Valida un documento leído de disco. Si no es compatible con esta versión, se ignora (nunca se borra nada más). */
 export function parseResume(raw: unknown): ResumeDoc | null {
   if (!isObj(raw) || raw.v !== RESUME_VERSION) return null;
-  if (!["lesson", "costa", "talk"].includes(String(raw.kind))) return null;
+  if (!["lesson", "costa", "talk", "interview"].includes(String(raw.kind))) return null;
   if (typeof raw.id !== "string" || typeof raw.title !== "string" || typeof raw.href !== "string" || typeof raw.stage !== "string") return null;
   if (!isNum(raw.attempt) || !isNum(raw.savedAt) || !isObj(raw.runs)) return null;
   const runs: Record<string, RunSnapshot> = {};
@@ -114,7 +114,7 @@ export async function saveLastVisited(v: Omit<LastVisited, "at">, now = Date.now
 export async function loadLastVisited(): Promise<LastVisited | null> {
   const r = (await getDb().settings.get("last"))?.value;
   if (!isObj(r) || typeof r.id !== "string" || typeof r.href !== "string" || typeof r.title !== "string" || !isNum(r.at)) return null;
-  if (!["lesson", "costa", "talk"].includes(String(r.kind))) return null;
+  if (!["lesson", "costa", "talk", "interview"].includes(String(r.kind))) return null;
   return { kind: r.kind as ResumeKind, id: r.id, title: r.title, href: r.href, ...(typeof r.unitId === "string" ? { unitId: r.unitId } : {}), at: r.at };
 }
 
